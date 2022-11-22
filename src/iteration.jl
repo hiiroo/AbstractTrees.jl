@@ -228,10 +228,11 @@ end
 
 LeavesState(node) = (LeavesState ∘ TreeCursor)(node)
 
-initial(::Type{LeavesState}, node) = (LeavesState ∘ descendleft ∘ TreeCursor)(node)
+initial(::Type{LeavesState}, node) = (LeavesState  ∘ TreeCursor)(node)
 
 function next(s::LeavesState)
     csr = s.cursor
+    
     while !isnothing(csr) && !isroot(csr)
         n = nextsibling(csr)
         if isnothing(n)
@@ -243,7 +244,6 @@ function next(s::LeavesState)
     end
     nothing
 end
-
 
 """
     Leaves{T} <: TreeIterator{T}
@@ -258,12 +258,29 @@ Any[1,Any[2,3]]
 ```
 we will get `[1,2,3]`.
 """
-struct Leaves{T} <: TreeIterator{T}
+struct Leaves{T,F} <: TreeIterator{T}
+    filter::F
     root::T
 end
 
+Leaves(root) = Leaves(nothing, root)
+
 statetype(itr::Leaves) = LeavesState
 
+function Base.iterate(
+    ti::Leaves,
+    s::Union{Nothing,AbstractTrees.IteratorState}=AbstractTrees.initial(PreOrderState, ti.root))
+
+    isnothing(s) && return nothing
+    if (ti.filter == nothing && isroot(s.cursor))
+        s = LeavesState(descendleft(s.cursor))
+    end
+    while ((ti.filter != nothing) && !ti.filter(nodevalue(s.cursor)))
+        s = next(s)
+        isnothing(s) && return nothing
+    end
+    return (nodevalue(s.cursor), next(LeavesState(s.cursor)))
+end
 
 """
     SiblingState{T<:TreeCursor} <: IteratorState{T}
